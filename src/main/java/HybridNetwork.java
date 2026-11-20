@@ -21,6 +21,7 @@ public class HybridNetwork {
 
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
+        boolean skinsRestorer = Main.CONFIG.getBoolean("allow-skins-restorer", true);
 
         if (allowJava) {
             Thread.ofVirtual().start(() -> {
@@ -31,6 +32,8 @@ public class HybridNetwork {
                      .childHandler(new ChannelInitializer<SocketChannel>() {
                          @Override
                          protected void initChannel(SocketChannel ch) {
+                             ch.pipeline().addLast("multiversion-router",
+                                 new MultiVersionRouter(motd, javaWorldName, maxPlayers, allVersions));
                          }
                      });
 
@@ -67,6 +70,8 @@ public class HybridNetwork {
                      .childHandler(new ChannelInitializer<>() {
                          @Override
                          protected void initChannel(io.netty.channel.Channel ch) {
+                             ch.pipeline().addLast("bedrock-java-bridge",
+                                 new BedrockToJavaBridge(javaPort, onlineMode, skinsRestorer));
                          }
                      });
 
