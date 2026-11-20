@@ -61,7 +61,7 @@ public class HybridLoader {
 
             if (unixArgs.isEmpty()) {
                 System.out.println("[Hybrid-Core] Fetching latest NeoForge 1.21.11 from official Maven...");
-                                String host = "https://" + "maven.neoforged.net/releases/net/neoforged/neoforge/";
+                String host = "https://" + "maven.neoforged.net/releases/net/neoforged/neoforge/";
                 String metadataUrl = host + "maven-metadata.xml";
                 String xml = new String(URI.create(metadataUrl).toURL().openStream().readAllBytes(), StandardCharsets.UTF_8);
 
@@ -69,8 +69,8 @@ public class HybridLoader {
                 Matcher m = Pattern.compile("<version>(21\\.11\\.[^<]+)</version>").matcher(xml);
                 while (m.find()) {
                     latestVersion = m.group(1);
-                }        
-                
+                }
+
                 String installerUrl = host + latestVersion + "/neoforge-" + latestVersion + "-installer.jar";
                 Path installerPath = Path.of("modloader-installer.jar");
 
@@ -83,6 +83,8 @@ public class HybridLoader {
                     pb.start().waitFor();
                     Files.deleteIfExists(installerPath);
                 }
+
+                deleteIfEmptyDir(Path.of("mods"));
 
                 try (Stream<Path> walk = Files.walk(librariesDir)) {
                     unixArgs = walk
@@ -100,6 +102,7 @@ public class HybridLoader {
                     try {
                         ProcessBuilder serverPb = new ProcessBuilder(
                             "java",
+                            "-Dfml.modsDir=java-packs/mods",
                             "@" + argsFile.toString(),
                             "--nogui",
                             "--port", String.valueOf(internalBackendPort)
@@ -110,7 +113,8 @@ public class HybridLoader {
                         System.err.println("[Hybrid-Core] World Engine stopped: " + runEx.getMessage());
                     }
                 });
-                                deleteIfEmptyDir(Path.of("mods"));
+
+                deleteIfEmptyDir(Path.of("mods"));
             }
         } catch (Exception e) {
             System.err.println("[Hybrid-Core] Error: " + e.getMessage());
@@ -128,7 +132,6 @@ public class HybridLoader {
             }
         } catch (IOException ignored) {}
     }
-    
     private static void loadRealMods(String folderName) {
         File folder = new File(folderName);
         File[] jars = folder.listFiles((dir, name) -> name.endsWith(".jar"));
@@ -327,7 +330,8 @@ public class HybridLoader {
                     }
                 }
             }
-         }
+        }
+    }
 
     private static void parseAndRegisterPack(String rawJson, File source, String forcedCategory, boolean mandatory, byte[] bytesToHash) throws Exception {
         String uuid = UUID.randomUUID().toString();
