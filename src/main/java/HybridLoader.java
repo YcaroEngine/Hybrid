@@ -322,13 +322,14 @@ public class HybridLoader {
                                 }
                             }
                         }
+                    }
+                }
                     } catch (Exception e) {
                         System.err.println("[Hybrid-BedrockPacks] Error reading archive " + item.getName() + ": " + e.getMessage());
                     }
                 }
             }
-        
-
+            
     private static void parseAndRegisterPack(String rawJson, File source, String forcedCategory, boolean mandatory, byte[] bytesToHash) throws Exception {
         String uuid = UUID.randomUUID().toString();
         String version = "1.0.0";
