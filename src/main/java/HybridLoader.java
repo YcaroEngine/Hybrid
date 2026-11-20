@@ -110,10 +110,26 @@ public class HybridLoader {
                         System.err.println("[Hybrid-Core] World Engine stopped: " + runEx.getMessage());
                     }
                 });
+                                deleteIfEmptyDir(Path.of("mods"));
             }
         } catch (Exception e) {
             System.err.println("[Hybrid-Core] Error: " + e.getMessage());
         }
+    }
+
+    private static void deleteIfEmptyDir(Path dir) {
+        try {
+            if (Files.exists(dir) && Files.isDirectory(dir)) {
+                try (Stream<Path> entries = Files.list(dir)) {
+                    if (entries.findAny().isEmpty()) {
+                        Files.delete(dir);
+                    }
+                }
+            }
+        } catch (IOException ignored) {}
+    }
+           }
+        } 
     }
     private static void loadRealMods(String folderName) {
         File folder = new File(folderName);
