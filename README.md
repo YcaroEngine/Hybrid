@@ -2,9 +2,9 @@
   🌐 <b>English</b> | <a href="README.pt-BR.md">🇧🇷 Português</a>
 </div>
 
-> [!WARNING]
-> # Hybrid Engine (BETA)
-> **The ultimate Minecraft server software: Hybrid, Multi-version, and featuring Native Cross-Play.**
+# Hybrid Engine (BETA)
+
+**The ultimate Minecraft server software: Hybrid, Multi-version, and featuring Native Cross-Play.**
 
 Hybrid is a revolutionary, beta-stage server software designed to unify the entire Minecraft ecosystem into a single file. No more setting up dozens of external bridges or choosing between mods and plugins—simply replace your current `server.jar` with Hybrid and you’re all set!
 
