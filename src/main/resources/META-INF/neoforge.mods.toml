@@ -1,0 +1,10 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="MIT"
+
+[[mods]]
+modId="hybrid"
+version="ALL-VERSIONS"
+displayName="Hybrid"
+description="Hybrid Universal Software (Java + Bedrock | All Versions)"
+
