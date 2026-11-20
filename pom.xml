@@ -3,9 +3,10 @@
          xsi:schemaLocation="http://apache.org http://apache.org">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.hybrid.engine</groupId>
+    <groupId>com.hybrid</groupId>
     <artifactId>hybrid</artifactId>
-    <version>1.21.11-UNIVERSAL</version>
+    <version>ALL-VERSIONS</version>
+    <name>Hybrid</name>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
