@@ -24,7 +24,7 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       - name: Compilar server.jar
-        run: mvn -B -s settings.xml package
+        run: mvn -B -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 package
       - name: Publicar server.jar direto na Release
         uses: softprops/action-gh-release@v2
         with:
