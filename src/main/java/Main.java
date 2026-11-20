@@ -1,4 +1,3 @@
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Scanner;
@@ -8,10 +7,13 @@ public class Main {
     public static final ServerConfig CONFIG = new ServerConfig();
 
     public static void main(String[] args) {
+        long startTime = System.currentTimeMillis();
         try {
             Files.createDirectories(Path.of("mods"));
             Files.createDirectories(Path.of("plugins"));
-            Files.createDirectories(Path.of("bedrock-packs"));
+            Files.createDirectories(Path.of("bedrock-packs/resource-packs"));
+            Files.createDirectories(Path.of("bedrock-packs/behavior-packs"));
+            Files.createDirectories(Path.of("bedrock-packs/raw-packs"));
             CONFIG.loadOrCreate();
 
             String serverName = CONFIG.getString("server-name", "Hybrid Server");
@@ -51,37 +53,28 @@ public class Main {
             System.out.println("==========================================================================");
 
             HybridLoader.initializeEnvironment();
-            loadBedrockPacks();
 
             HybridNetwork.start(ip, javaPort, bedrockPort, motd, javaWorldName, bedrockWorldName,
                                  maxPlayers, gamemode, compression, onlineMode, allVersions, allowJava, allowBedrock);
+
+            double elapsed = (System.currentTimeMillis() - startTime) / 1000.0;
+            System.out.printf("Done (%.3fs)! For help, type \"help\"%n", elapsed);
 
             Scanner scanner = new Scanner(System.in);
             while (scanner.hasNextLine()) {
                 String cmd = scanner.nextLine().trim();
                 if (cmd.equalsIgnoreCase("stop")) {
                     System.out.println("[Hybrid] Saving world and shutting down server...");
+                    HybridLoader.shutdownAll();
                     System.exit(0);
+                } else if (cmd.equalsIgnoreCase("help")) {
+                    System.out.println("[Hybrid] Commands: stop, help");
                 }
             }
 
         } catch (Exception e) {
             System.err.println("[Hybrid-ERROR] " + e.getMessage());
             e.printStackTrace();
-        }
-    }
-
-    private static void loadBedrockPacks() {
-        File folder = new File("bedrock-packs");
-        File[] packs = folder.listFiles((dir, name) -> name.endsWith(".mcpack") || name.endsWith(".zip") || name.endsWith(".mcaddon"));
-
-        if (packs == null || packs.length == 0) {
-            System.out.println("[Hybrid-BedrockPacks] No resource/behavior packs found in /bedrock-packs");
-            return;
-        }
-
-        for (File pack : packs) {
-            System.out.println("[Hybrid-BedrockPacks] Loaded pack for Bedrock clients: " + pack.getName() + " (" + (pack.length() / 1024) + " KB)");
         }
     }
 }
