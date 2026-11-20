@@ -67,6 +67,10 @@ public class ServerConfig {
         defaults.put("require-bedrock-packs", "true");
         defaults.put("require-resource-pack-java", "false");
 
+                // Sincroniza require-resource-pack-java com o require-resource-pack nativo do Java
+        String javaReq = props.getProperty("require-resource-pack-java", "false");
+        props.setProperty("require-resource-pack", javaReq);
+
         boolean updated = !Files.exists(file);
         StringBuilder sb = new StringBuilder();
         if (Files.exists(file)) {
