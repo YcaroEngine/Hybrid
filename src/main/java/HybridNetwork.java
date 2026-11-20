@@ -56,7 +56,7 @@ public class HybridNetwork {
         if (allowBedrock) {
             Thread.ofVirtual().start(() -> {
                 try {
-                    long serverGuid = 13253860892328930865L;
+                    long serverGuid = Long.parseUnsignedLong("13253860892328930865");
                     String bedrockPing = String.join(";",
                         "MCPE",
                         motd,
