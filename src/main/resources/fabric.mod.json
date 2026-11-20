@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "hybrid",
+  "version": "ALL-VERSIONS",
+  "name": "Hybrid",
+  "environment": "*",
+  "entrypoints": {
+    "server": [
+      "HybridBootstrapPlugin"
+    ],
+    "main": [
+      "HybridBootstrapPlugin"
+    ]
+  }
+}
