@@ -327,7 +327,6 @@ public class HybridLoader {
                     }
                 }
             }
-        }
         
 
     private static void parseAndRegisterPack(String rawJson, File source, String forcedCategory, boolean mandatory, byte[] bytesToHash) throws Exception {
