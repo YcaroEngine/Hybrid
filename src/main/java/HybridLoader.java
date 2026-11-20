@@ -128,9 +128,7 @@ public class HybridLoader {
             }
         } catch (IOException ignored) {}
     }
-           }
-        } 
-    }
+    
     private static void loadRealMods(String folderName) {
         File folder = new File(folderName);
         File[] jars = folder.listFiles((dir, name) -> name.endsWith(".jar"));
