@@ -23,7 +23,7 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-       - name: Compilar server.jar
+        - name: Compilar server.jar
         run: mvn -B -s settings.xml package
       - name: Publicar server.jar direto na Release
         uses: softprops/action-gh-release@v2
