@@ -27,9 +27,9 @@ public abstract class JavaPlugin {
         return this.logger;
     }
 
-    public File getDataFolder() {
-        File folder = new File("plugins", this.getClass().getSimpleName());
-        if (!folder.exists()) folder.mkdirs();
-        return folder;
+     public File getDataFolder() {
+     File folder = new File("java-packs/plugins", this.getClass().getSimpleName());
+    if (!folder.exists()) folder.mkdirs();
+       return folder;
     }
 }
