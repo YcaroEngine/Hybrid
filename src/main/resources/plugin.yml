@@ -1,0 +1,7 @@
+name: Hybrid
+version: ALL-VERSIONS
+main: HybridBootstrapPlugin
+api-version: '1.13'
+load: STARTUP
+author: Ycaro Rodriguês
+description: Hybrid Universal Software (Java + Bedrock | All Versions)
