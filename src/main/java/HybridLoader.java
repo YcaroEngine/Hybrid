@@ -61,16 +61,17 @@ public class HybridLoader {
 
             if (unixArgs.isEmpty()) {
                 System.out.println("[Hybrid-Core] Fetching latest NeoForge 1.21.11 from official Maven...");
-                String metadataUrl = "https://neoforged.net";
+                                String host = "https://" + "maven.neoforged.net/releases/net/neoforged/neoforge/";
+                String metadataUrl = host + "maven-metadata.xml";
                 String xml = new String(URI.create(metadataUrl).toURL().openStream().readAllBytes(), StandardCharsets.UTF_8);
 
-                String latestVersion = "21.11.38-beta";
+                String latestVersion = "21.11.38";
                 Matcher m = Pattern.compile("<version>(21\\.11\\.[^<]+)</version>").matcher(xml);
                 while (m.find()) {
                     latestVersion = m.group(1);
-                }
-
-                String installerUrl = "https://neoforged.net" + latestVersion + "/neoforge-" + latestVersion + "-installer.jar";
+                }        
+                
+                String installerUrl = host + latestVersion + "/neoforge-" + latestVersion + "-installer.jar";
                 Path installerPath = Path.of("modloader-installer.jar");
 
                 System.out.println("[Hybrid-Core] Downloading NeoForge " + latestVersion + "...");
