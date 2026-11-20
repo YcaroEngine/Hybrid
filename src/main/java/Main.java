@@ -9,8 +9,9 @@ public class Main {
     public static void main(String[] args) {
         long startTime = System.currentTimeMillis();
         try {
-            Files.createDirectories(Path.of("mods"));
-            Files.createDirectories(Path.of("plugins"));
+            Files.createDirectories(Path.of(".hybrid"));
+            Files.createDirectories(Path.of("java-packs/mods"));
+            Files.createDirectories(Path.of("java-packs/plugins"));
             Files.createDirectories(Path.of("bedrock-packs/resource-packs"));
             Files.createDirectories(Path.of("bedrock-packs/behavior-packs"));
             Files.createDirectories(Path.of("bedrock-packs/raw-packs"));
