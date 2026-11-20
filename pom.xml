@@ -3,10 +3,9 @@
          xsi:schemaLocation="http://apache.org http://apache.org">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.hybrid</groupId>
-    <artifactId>hybrid</artifactId>
-    <version>ALL-VERSIONS</version>
-    <name>Hybrid</name>
+    <groupId>com.ycaroengine</groupId>
+    <artifactId>Hybrid</artifactId>
+    <version>1.0-BETA</version>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -14,31 +13,57 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>papermc</id>
+            <url>https://papermc.io</url>
+        </repository>
+        <repository>
+            <id>opencollab-releases</id>
+            <url>https://opencollab.dev</url>
+        </repository>
+        <repository>
+            <id>opencollab-snapshots</id>
+            <url>https://opencollab.dev</url>
+        </repository>
+    </repositories>
+
     <dependencies>
+        <dependency>
+            <groupId>io.papermc.paper</groupId>
+            <artifactId>paper-api</artifactId>
+            <version>1.21.4-R0.1-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.cloudburstmc.protocol</groupId>
+            <artifactId>bedrock-connection</artifactId>
+            <version>3.0.0.Beta14-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.cloudburstmc.netty</groupId>
+            <artifactId>netty-transport-raknet</artifactId>
+            <version>1.0.0.CR3-SNAPSHOT</version>
+        </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
             <version>4.1.115.Final</version>
         </dependency>
         <dependency>
-            <groupId>org.ow2.asm</groupId>
-            <artifactId>asm</artifactId>
-            <version>9.7.1</version>
-        </dependency>
-        <dependency>
-            <groupId>org.ow2.asm</groupId>
-            <artifactId>asm-commons</artifactId>
-            <version>9.7.1</version>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.11.0</version>
         </dependency>
         <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
-            <version>2.2</version>
+            <version>2.3</version>
         </dependency>
         <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-            <version>2.11.0</version>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+            <version>9.7.1</version>
         </dependency>
     </dependencies>
 
@@ -52,8 +77,17 @@
                 <executions>
                     <execution>
                         <phase>package</phase>
-                        <goals><goal>shade</goal></goals>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
                         <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>Main</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
@@ -64,11 +98,6 @@
                                     </excludes>
                                 </filter>
                             </filters>
-                            <transformers>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>Main</mainClass>
-                                </transformer>
-                            </transformers>
                         </configuration>
                     </execution>
                 </executions>
