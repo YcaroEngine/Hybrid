@@ -22,9 +22,8 @@
 
             if (unixArgs.isEmpty()) {
                 System.out.println("[Hybrid-Core] Fetching latest NeoForge 1.21.11 from official Maven...");
-                String metadataUrl = "https://neoforged.net";
+                String installerUrl = "https://neoforged.net" + latestVersion + "/neoforge-" + latestVersion + "-installer.jar";
                 String xml = new String(URI.create(metadataUrl).toURL().openStream().readAllBytes(), StandardCharsets.UTF_8);
-
                 String latestVersion = "21.11.38-beta";
                 Matcher m = Pattern.compile("<version>(21\\.11\\.[^<]+)</version>").matcher(xml);
                 while (m.find()) {
