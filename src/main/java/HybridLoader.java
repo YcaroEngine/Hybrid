@@ -1,4 +1,5 @@
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -19,21 +20,23 @@ import java.security.MessageDigest;
 import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public class HybridLoader {
-    private static final Gson GSON = new Gson();
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final List<Object> ACTIVE_PLUGINS = new ArrayList<>();
     private static final List<Object> ACTIVE_MODS = new ArrayList<>();
     public static final List<BedrockPackInfo> BEDROCK_PACKS = new ArrayList<>();
 
-    public record BedrockPackInfo(String uuid, String version, String name, File file, long sizeBytes, byte[] sha256) {}
+    public record BedrockPackInfo(String uuid, String version, String name, String category, boolean mandatoryForBedrock, File source, long sizeBytes, byte[] sha256) {}
 
     public static void initializeEnvironment() {
         setupModLoaderCore();
         loadRealMods("mods");
         loadRealPlugins("plugins");
-        loadRealBedrockPacks("bedrock-packs");
+        loadAllBedrockPacks();
     }
 
     private static void setupModLoaderCore() {
@@ -52,19 +55,29 @@ public class HybridLoader {
             }
 
             if (coreJar.isEmpty()) {
-                System.out.println("[Hybrid-Core] NeoForge/Forge 1.21.11 not found in /libraries. Downloading NeoForge 1.21.11...");
-                String installerUrl = "https://neoforged.net";
+                System.out.println("[Hybrid-Core] Fetching latest NeoForge 1.21.11 from official Maven...");
+                String metadataUrl = "https://neoforged.net";
+                String xml = new String(URI.create(metadataUrl).toURL().openStream().readAllBytes(), StandardCharsets.UTF_8);
+
+                String latestVersion = "21.11.38-beta";
+                Matcher m = Pattern.compile("<version>(21\\.11\\.[^<]+)</version>").matcher(xml);
+                while (m.find()) {
+                    latestVersion = m.group(1);
+                }
+
+                String installerUrl = "https://neoforged.net" + latestVersion + "/neoforge-" + latestVersion + "-installer.jar";
                 Path installerPath = Path.of("modloader-installer.jar");
 
+                System.out.println("[Hybrid-Core] Downloading NeoForge " + latestVersion + "...");
                 try (InputStream in = URI.create(installerUrl).toURL().openStream()) {
                     Files.copy(in, installerPath, StandardCopyOption.REPLACE_EXISTING);
-                    System.out.println("[Hybrid-Core] Installing 1.21.11 NeoForge/Forge server libraries...");
+                    System.out.println("[Hybrid-Core] Installing NeoForge " + latestVersion + " server libraries...");
                     ProcessBuilder pb = new ProcessBuilder("java", "-jar", installerPath.toString(), "--installServer");
                     pb.inheritIO();
                     pb.start().waitFor();
                     Files.deleteIfExists(installerPath);
                 } catch (Exception ex) {
-                    System.err.println("[Hybrid-Core] Notice: " + ex.getMessage());
+                    System.err.println("[Hybrid-Core] Installer notice: " + ex.getMessage());
                 }
             } else {
                 System.out.println("[Hybrid-Core] Hooked into 1.21.11 ModLoader core: " + coreJar.get().getFileName());
@@ -73,7 +86,6 @@ public class HybridLoader {
             System.err.println("[Hybrid-Core] Error: " + e.getMessage());
         }
     }
-
     private static void loadRealMods(String folderName) {
         File folder = new File(folderName);
         File[] jars = folder.listFiles((dir, name) -> name.endsWith(".jar"));
@@ -88,22 +100,24 @@ public class HybridLoader {
                 boolean isNeoForge = jarFile.getEntry("META-INF/neoforge.mods.toml") != null;
                 boolean isForge = jarFile.getEntry("META-INF/mods.toml") != null;
                 boolean isFabric = jarFile.getEntry("fabric.mod.json") != null;
+                boolean hasClientTextures = jarFile.getEntry("assets/") != null;
 
                 if (isNeoForge || isForge) {
                     String type = isNeoForge ? "NeoForge" : "Forge";
+                    String side = hasClientTextures ? "Client+Server (Textures detected)" : "Server-Side Only (No client texture required)";
                     List<String> modClasses = scanForgeModClasses(jarFile);
                     for (String className : modClasses) {
                         try {
                             Class<?> clazz = Class.forName(className, true, modLoader);
                             Object instance = clazz.getDeclaredConstructor().newInstance();
                             ACTIVE_MODS.add(instance);
-                            System.out.println("[Hybrid-Mods] Loaded " + type + " @Mod: " + className + " (" + jar.getName() + ")");
+                            System.out.println("[Hybrid-Mods] Loaded " + type + " @Mod: " + className + " | " + side);
                         } catch (Throwable t) {
-                            System.out.println("[Hybrid-Mods] Queued " + type + " mod for ModLauncher: " + jar.getName());
+                            System.out.println("[Hybrid-Mods] Queued " + type + " mod: " + jar.getName() + " | " + side);
                         }
                     }
                     if (modClasses.isEmpty()) {
-                        System.out.println("[Hybrid-Mods] Queued " + type + " archive: " + jar.getName());
+                        System.out.println("[Hybrid-Mods] Queued " + type + " archive: " + jar.getName() + " | " + side);
                     }
                 } else if (isFabric) {
                     JarEntry entry = jarFile.getJarEntry("fabric.mod.json");
@@ -132,6 +146,7 @@ public class HybridLoader {
             }
         }
     }
+
     private static List<String> scanForgeModClasses(JarFile jarFile) throws IOException {
         List<String> classes = new ArrayList<>();
         Enumeration<JarEntry> entries = jarFile.entries();
@@ -179,6 +194,7 @@ public class HybridLoader {
                     Map<String, Object> data = yaml.load(jarFile.getInputStream(ymlEntry));
                     String pluginName = String.valueOf(data.getOrDefault("name", jar.getName()));
                     String mainClass = String.valueOf(data.get("main"));
+                    boolean hasEmbeddedPack = jarFile.getEntry("assets/") != null || jarFile.getEntry("pack.mcmeta") != null;
 
                     URLClassLoader pluginLoader = new URLClassLoader(new URL[]{jar.toURI().toURL()}, HybridLoader.class.getClassLoader());
                     Class<?> clazz = Class.forName(mainClass, true, pluginLoader);
@@ -193,51 +209,154 @@ public class HybridLoader {
                     }
 
                     ACTIVE_PLUGINS.add(instance);
-                    System.out.println("[Hybrid-Plugins] Enabled Purpur/Paper/Spigot/Bukkit Plugin: " + pluginName + " (" + mainClass + ")");
+                    String modeNote = hasEmbeddedPack ? "Has Embedded Texture Pack" : "Server-Side Only (No texture added)";
+                    System.out.println("[Hybrid-Plugins] Enabled Plugin: " + pluginName + " | " + modeNote);
                 }
             } catch (Exception e) {
                 System.err.println("[Hybrid-Plugins] Failed to enable " + jar.getName() + ": " + e.getMessage());
             }
         }
     }
-
-    private static void loadRealBedrockPacks(String folderName) {
+    private static void loadAllBedrockPacks() {
         BEDROCK_PACKS.clear();
-        File folder = new File(folderName);
-        File[] packs = folder.listFiles((dir, name) -> name.endsWith(".mcpack") || name.endsWith(".zip") || name.endsWith(".mcaddon"));
-
-        if (packs == null || packs.length == 0) {
-            System.out.println("[Hybrid-BedrockPacks] No packs in /" + folderName);
-            return;
+        try {
+            Files.createDirectories(Path.of("bedrock-packs/resource-packs"));
+            Files.createDirectories(Path.of("bedrock-packs/behavior-packs"));
+            Files.createDirectories(Path.of("bedrock-packs/raw-packs"));
+        } catch (IOException e) {
+            System.err.println("[Hybrid-BedrockPacks] Failed to create pack folders: " + e.getMessage());
         }
 
-        for (File pack : packs) {
-            try (JarFile zip = new JarFile(pack)) {
-                JarEntry manifestEntry = zip.getJarEntry("manifest.json");
-                String uuid = UUID.randomUUID().toString();
-                String version = "1.0.0";
-                String name = pack.getName();
+        boolean mandatory = Main.CONFIG.getBoolean("require-bedrock-packs", true);
 
-                if (manifestEntry != null) {
-                    String rawJson = new String(zip.getInputStream(manifestEntry).readAllBytes(), StandardCharsets.UTF_8);
-                    JsonObject manifest = GSON.fromJson(rawJson, JsonObject.class);
-                    if (manifest.has("header")) {
-                        JsonObject header = manifest.getAsJsonObject("header");
-                        if (header.has("uuid")) uuid = header.get("uuid").getAsString();
-                        if (header.has("name")) name = header.get("name").getAsString();
-                        if (header.has("version")) {
-                            JsonArray v = header.getAsJsonArray("version");
-                            version = v.get(0).getAsInt() + "." + v.get(1).getAsInt() + "." + v.get(2).getAsInt();
-                        }
+        scanPackFolder(new File("bedrock-packs/resource-packs"), "RESOURCE", mandatory);
+        scanPackFolder(new File("bedrock-packs/behavior-packs"), "BEHAVIOR", mandatory);
+        scanPackFolder(new File("bedrock-packs/raw-packs"), "RAW_AUTO", mandatory);
+        scanPackFolder(new File("bedrock-packs"), "ROOT_AUTO", mandatory);
+
+        if (BEDROCK_PACKS.isEmpty()) {
+            System.out.println("[Hybrid-BedrockPacks] No packs found. Skipping world_resource_packs.json / world_behavior_packs.json generation.");
+        } else {
+            System.out.println("[Hybrid-BedrockPacks] " + BEDROCK_PACKS.size() + " Bedrock-only pack(s) active. Mandatory download for Bedrock clients: " + mandatory);
+            generateWorldPackBindings();
+        }
+    }
+
+    private static void scanPackFolder(File folder, String forcedCategory, boolean mandatory) {
+        File[] items = folder.listFiles();
+        if (items == null) return;
+
+        for (File item : items) {
+            if (item.isDirectory()) {
+                String dirName = item.getName();
+                if (dirName.equals("resource-packs") || dirName.equals("behavior-packs") || dirName.equals("raw-packs")) {
+                    continue;
+                }
+                File manifestFile = new File(item, "manifest.json");
+                if (manifestFile.exists()) {
+                    try {
+                        String rawJson = Files.readString(manifestFile.toPath(), StandardCharsets.UTF_8);
+                        parseAndRegisterPack(rawJson, item, forcedCategory, mandatory, item.getName().getBytes(StandardCharsets.UTF_8));
+                    } catch (Exception e) {
+                        System.err.println("[Hybrid-BedrockPacks] Error reading raw folder " + dirName + ": " + e.getMessage());
                     }
                 }
-
-                byte[] hash = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(pack.toPath()));
-                BEDROCK_PACKS.add(new BedrockPackInfo(uuid, version, name, pack, pack.length(), hash));
-                System.out.println("[Hybrid-BedrockPacks] Loaded pack: " + name + " | UUID: " + uuid + " | v" + version);
-            } catch (Exception e) {
-                System.err.println("[Hybrid-BedrockPacks] Error reading " + pack.getName() + ": " + e.getMessage());
+            } else {
+                String lower = item.getName().toLowerCase();
+                if (lower.endsWith(".mcpack") || lower.endsWith(".mcaddon") || lower.endsWith(".zip")) {
+                    try (JarFile zip = new JarFile(item)) {
+                        JarEntry manifestEntry = zip.getJarEntry("manifest.json");
+                        if (manifestEntry != null) {
+                            String rawJson = new String(zip.getInputStream(manifestEntry).readAllBytes(), StandardCharsets.UTF_8);
+                            parseAndRegisterPack(rawJson, item, forcedCategory, mandatory, Files.readAllBytes(item.toPath()));
+                        } else {
+                            Enumeration<JarEntry> entries = zip.entries();
+                            while (entries.hasMoreElements()) {
+                                JarEntry sub = entries.nextElement();
+                                if (sub.getName().endsWith("manifest.json")) {
+                                    String subJson = new String(zip.getInputStream(sub).readAllBytes(), StandardCharsets.UTF_8);
+                                    parseAndRegisterPack(subJson, item, "RAW_AUTO", mandatory, Files.readAllBytes(item.toPath()));
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        System.err.println("[Hybrid-BedrockPacks] Error reading archive " + item.getName() + ": " + e.getMessage());
+                    }
+                }
             }
+        }
+    }
+
+    private static void parseAndRegisterPack(String rawJson, File source, String forcedCategory, boolean mandatory, byte[] bytesToHash) throws Exception {
+        String uuid = UUID.randomUUID().toString();
+        String version = "1.0.0";
+        String name = source.getName();
+        String detectedType = forcedCategory;
+
+        JsonObject manifest = GSON.fromJson(rawJson, JsonObject.class);
+        if (manifest != null) {
+            if (manifest.has("header")) {
+                JsonObject header = manifest.getAsJsonObject("header");
+                if (header.has("uuid")) uuid = header.get("uuid").getAsString();
+                if (header.has("name")) name = header.get("name").getAsString();
+                if (header.has("version")) {
+                    JsonArray v = header.getAsJsonArray("version");
+                    version = v.get(0).getAsInt() + "." + v.get(1).getAsInt() + "." + v.get(2).getAsInt();
+                }
+            }
+            if ((forcedCategory.equals("RAW_AUTO") || forcedCategory.equals("ROOT_AUTO")) && manifest.has("modules")) {
+                JsonArray modules = manifest.getAsJsonArray("modules");
+                if (!modules.isEmpty()) {
+                    String modType = modules.get(0).getAsJsonObject().get("type").getAsString();
+                    detectedType = (modType.equalsIgnoreCase("data") || modType.equalsIgnoreCase("script")) ? "BEHAVIOR" : "RESOURCE";
+                }
+            }
+        }
+
+        if (detectedType.equals("RAW_AUTO") || detectedType.equals("ROOT_AUTO")) {
+            detectedType = "RESOURCE";
+        }
+
+        byte[] hash = MessageDigest.getInstance("SHA-256").digest(bytesToHash);
+        BEDROCK_PACKS.add(new BedrockPackInfo(uuid, version, name, detectedType, mandatory, source, source.length(), hash));
+        System.out.println("[Hybrid-BedrockPacks] [" + detectedType + "] Registered for Bedrock clients ONLY: " + name + " (UUID: " + uuid + " | v" + version + ")");
+    }
+
+    private static void generateWorldPackBindings() {
+        try {
+            String levelName = Main.CONFIG.getString("level-name", "world");
+            Path worldDir = Path.of(levelName);
+            Files.createDirectories(worldDir);
+
+            JsonArray resourceArray = new JsonArray();
+            JsonArray behaviorArray = new JsonArray();
+
+            for (BedrockPackInfo pack : BEDROCK_PACKS) {
+                JsonObject entry = new JsonObject();
+                entry.addProperty("pack_id", pack.uuid());
+                JsonArray ver = new JsonArray();
+                for (String part : pack.version().split("\\.")) {
+                    ver.add(Integer.parseInt(part));
+                }
+                entry.add("version", ver);
+
+                if (pack.category().equals("BEHAVIOR")) {
+                    behaviorArray.add(entry);
+                } else {
+                    resourceArray.add(entry);
+                }
+            }
+
+            if (!resourceArray.isEmpty()) {
+                Files.writeString(worldDir.resolve("world_resource_packs.json"), GSON.toJson(resourceArray));
+                System.out.println("[Hybrid-BedrockPacks] Generated /" + levelName + "/world_resource_packs.json (" + resourceArray.size() + " pack(s))");
+            }
+            if (!behaviorArray.isEmpty()) {
+                Files.writeString(worldDir.resolve("world_behavior_packs.json"), GSON.toJson(behaviorArray));
+                System.out.println("[Hybrid-BedrockPacks] Generated /" + levelName + "/world_behavior_packs.json (" + behaviorArray.size() + " pack(s))");
+            }
+        } catch (Exception e) {
+            System.err.println("[Hybrid-BedrockPacks] Could not write world pack bindings: " + e.getMessage());
         }
     }
 
@@ -250,4 +369,3 @@ public class HybridLoader {
         }
     }
 }
-
