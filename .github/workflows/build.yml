@@ -1,4 +1,4 @@
-name: Compilar Hybrid Engine
+name: Compilar Hybrid
 
 on:
   push:
