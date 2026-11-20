@@ -19,8 +19,9 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: 'maven'
       - name: Compilar server.jar
-        run: mvn clean package
+        run: mvn -B package
       - name: Upload Hybrid server.jar
         uses: actions/upload-artifact@v4
         with:
