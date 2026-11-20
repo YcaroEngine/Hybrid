@@ -65,6 +65,7 @@ public class ServerConfig {
         defaults.put("accept-all-versions", "true");
         defaults.put("allow-skins-restorer", "true");
         defaults.put("require-bedrock-packs", "true");
+        defaults.put("require-resource-pack-java", "false");
 
         boolean updated = !Files.exists(file);
         StringBuilder sb = new StringBuilder();
