@@ -5,6 +5,9 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -22,8 +25,10 @@ jobs:
           cache: 'maven'
       - name: Compilar server.jar
         run: mvn -B package
-      - name: Upload Hybrid server.jar
-        uses: actions/upload-artifact@v4
+      - name: Publicar server.jar direto na Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: Hybrid-Universal-server
-          path: target/server.jar
+          tag_name: latest
+          name: Hybrid Engine 1.21.11 (Latest Build)
+          files: target/server.jar
+          make_latest: true
