@@ -3,19 +3,18 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.Opcodes;
 import org.yaml.snakeyaml.Yaml;
 
-import java.io.*;
-import java.lang.reflect.Method;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.util.*;
 import java.util.jar.JarEntry;
@@ -27,64 +26,20 @@ import java.util.stream.Stream;
 public class HybridLoader {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final List<Object> ACTIVE_PLUGINS = new ArrayList<>();
-    private static final List<Object> ACTIVE_MODS = new ArrayList<>();
     public static final List<BedrockPackInfo> BEDROCK_PACKS = new ArrayList<>();
 
     public record BedrockPackInfo(String uuid, String version, String name, String category, boolean mandatoryForBedrock, File source, long sizeBytes, byte[] sha256) {}
 
     public static void initializeEnvironment() {
-        organizeJavaPacksFolder();
+        try {
+            Files.createDirectories(Path.of("plugins"));
+            Files.createDirectories(Path.of("mods"));
+        } catch (IOException ignored) {}
+
         setupModLoaderCore();
-        loadRealMods("java-packs/mods");
-        loadRealPlugins("java-packs/plugins");
+        loadRealPlugins("plugins");
         loadAllBedrockPacks();
     }
-
-    private static void organizeJavaPacksFolder() {
-        try {
-            Path modsTarget = Path.of("java-packs/mods");
-            Path pluginsTarget = Path.of("java-packs/plugins");
-            Files.createDirectories(modsTarget);
-            Files.createDirectories(pluginsTarget);
-
-            Path rootMods = Path.of("mods");
-            if (Files.exists(rootMods) && Files.isDirectory(rootMods)) {
-                try (Stream<Path> files = Files.list(rootMods)) {
-                    files.filter(p -> p.toString().endsWith(".jar")).forEach(jar -> {
-                        try {
-                            Files.move(jar, modsTarget.resolve(jar.getFileName()), StandardCopyOption.REPLACE_EXISTING);
-                            System.out.println("[Hybrid-Core] Moved mod to java-packs/mods: " + jar.getFileName());
-                        } catch (IOException ignored) {}
-                    });
-                }
-                deleteIfEmptyDir(rootMods);
-            }
-
-            try (Stream<Path> rootFiles = Files.list(Path.of("."))) {
-                rootFiles.filter(Files::isRegularFile)
-                         .filter(p -> p.toString().endsWith(".jar"))
-                         .filter(p -> !p.getFileName().toString().equalsIgnoreCase("server.jar"))
-                         .forEach(jar -> {
-                             try (JarFile jf = new JarFile(jar.toFile())) {
-                                 boolean isPlugin = jf.getEntry("plugin.yml") != null || jf.getEntry("paper-plugin.yml") != null;
-                                 boolean isMod = jf.getEntry("META-INF/neoforge.mods.toml") != null ||
-                                                 jf.getEntry("META-INF/mods.toml") != null ||
-                                                 jf.getEntry("fabric.mod.json") != null;
-                                 if (isPlugin) {
-                                     Files.move(jar, pluginsTarget.resolve(jar.getFileName()), StandardCopyOption.REPLACE_EXISTING);
-                                     System.out.println("[Hybrid-Core] Moved loose plugin to java-packs/plugins: " + jar.getFileName());
-                                 } else if (isMod) {
-                                     Files.move(jar, modsTarget.resolve(jar.getFileName()), StandardCopyOption.REPLACE_EXISTING);
-                                     System.out.println("[Hybrid-Core] Moved loose mod to java-packs/mods: " + jar.getFileName());
-                                 }
-                             } catch (Exception ignored) {}
-                         });
-            }
-        } catch (IOException e) {
-            System.err.println("[Hybrid-Core] Folder organization warning: " + e.getMessage());
-        }
-    }
-
     private static void setupModLoaderCore() {
         Path librariesDir = Path.of("libraries");
         try {
@@ -107,7 +62,7 @@ public class HybridLoader {
 
             if (unixArgs.isEmpty()) {
                 System.out.println("[Hybrid-Core] Fetching latest NeoForge 1.21.11 from official Maven...");
-                String host = "https://" + "maven.neoforged.net/releases/net/neoforged/neoforge/";
+                String host = "https://neoforged.net";
                 String metadataUrl = host + "maven-metadata.xml";
                 String xml = new String(URI.create(metadataUrl).toURL().openStream().readAllBytes(), StandardCharsets.UTF_8);
 
@@ -133,8 +88,6 @@ public class HybridLoader {
                     Files.deleteIfExists(Path.of("user_jvm_args.txt"));
                 }
 
-                organizeJavaPacksFolder();
-
                 try (Stream<Path> walk = Files.walk(librariesDir)) {
                     unixArgs = walk
                         .filter(p -> p.getFileName().toString().equals("unix_args.txt") && p.toString().contains("neoforge"))
@@ -151,7 +104,6 @@ public class HybridLoader {
                     try {
                         ProcessBuilder serverPb = new ProcessBuilder(
                             "java",
-                            "-Dfml.modsDir=java-packs/mods",
                             "@" + argsFile.toString(),
                             "--nogui",
                             "--port", String.valueOf(internalBackendPort)
@@ -162,114 +114,10 @@ public class HybridLoader {
                         System.err.println("[Hybrid-Core] World Engine stopped: " + runEx.getMessage());
                     }
                 });
-
-                deleteIfEmptyDir(Path.of("mods"));
             }
         } catch (Exception e) {
             System.err.println("[Hybrid-Core] Error: " + e.getMessage());
         }
-    }
-
-    private static void deleteIfEmptyDir(Path dir) {
-        try {
-            if (Files.exists(dir) && Files.isDirectory(dir)) {
-                try (Stream<Path> entries = Files.list(dir)) {
-                    if (entries.findAny().isEmpty()) {
-                        Files.delete(dir);
-                    }
-                }
-            }
-        } catch (IOException ignored) {}
-    }
-
-    private static void loadRealMods(String folderName) {
-        File folder = new File(folderName);
-        File[] jars = folder.listFiles((dir, name) -> name.endsWith(".jar"));
-        if (jars == null || jars.length == 0) {
-            System.out.println("[Hybrid-Mods] No mods in /" + folderName);
-            return;
-        }
-
-        for (File jar : jars) {
-            try (JarFile jarFile = new JarFile(jar)) {
-                URLClassLoader modLoader = new URLClassLoader(new URL[]{jar.toURI().toURL()}, HybridLoader.class.getClassLoader());
-                boolean isNeoForge = jarFile.getEntry("META-INF/neoforge.mods.toml") != null;
-                boolean isForge = jarFile.getEntry("META-INF/mods.toml") != null;
-                boolean isFabric = jarFile.getEntry("fabric.mod.json") != null;
-                boolean hasClientTextures = jarFile.getEntry("assets/") != null;
-
-                if (isNeoForge || isForge) {
-                    String type = isNeoForge ? "NeoForge" : "Forge";
-                    String side = hasClientTextures ? "Client+Server (Textures detected)" : "Server-Side Only (No client texture required)";
-                    List<String> modClasses = scanForgeModClasses(jarFile);
-                    for (String className : modClasses) {
-                        try {
-                            Class<?> clazz = Class.forName(className, true, modLoader);
-                            Object instance = clazz.getDeclaredConstructor().newInstance();
-                            ACTIVE_MODS.add(instance);
-                            System.out.println("[Hybrid-Mods] Loaded " + type + " @Mod: " + className + " | " + side);
-                        } catch (Throwable t) {
-                            System.out.println("[Hybrid-Mods] Queued " + type + " mod: " + jar.getName() + " | " + side);
-                        }
-                    }
-                    if (modClasses.isEmpty()) {
-                        System.out.println("[Hybrid-Mods] Queued " + type + " archive: " + jar.getName() + " | " + side);
-                    }
-                } else if (isFabric) {
-                    JarEntry entry = jarFile.getJarEntry("fabric.mod.json");
-                    String jsonText = new String(jarFile.getInputStream(entry).readAllBytes(), StandardCharsets.UTF_8);
-                    JsonObject json = GSON.fromJson(jsonText, JsonObject.class);
-
-                    if (json.has("entrypoints")) {
-                        JsonObject entrypoints = json.getAsJsonObject("entrypoints");
-                        JsonArray serverEntries = entrypoints.has("server") ? entrypoints.getAsJsonArray("server") : entrypoints.getAsJsonArray("main");
-                        if (serverEntries != null && !serverEntries.isEmpty()) {
-                            String mainClass = serverEntries.get(0).getAsString();
-                            Class<?> clazz = Class.forName(mainClass, true, modLoader);
-                            Object instance = clazz.getDeclaredConstructor().newInstance();
-                            for (Method m : clazz.getMethods()) {
-                                if (m.getName().equals("onInitializeServer") || m.getName().equals("onInitialize")) {
-                                    m.invoke(instance);
-                                }
-                            }
-                            ACTIVE_MODS.add(instance);
-                            System.out.println("[Hybrid-Mods] Executed Fabric Mod: " + jar.getName() + " (" + mainClass + ")");
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                System.err.println("[Hybrid-Mods] Error reading " + jar.getName() + ": " + e.getMessage());
-            }
-        }
-    }
-
-    private static List<String> scanForgeModClasses(JarFile jarFile) throws IOException {
-        List<String> classes = new ArrayList<>();
-        Enumeration<JarEntry> entries = jarFile.entries();
-        while (entries.hasMoreElements()) {
-            JarEntry entry = entries.nextElement();
-            if (entry.getName().endsWith(".class")) {
-                try (InputStream is = jarFile.getInputStream(entry)) {
-                    ClassReader reader = new ClassReader(is);
-                    reader.accept(new ClassVisitor(Opcodes.ASM9) {
-                        String className;
-                        @Override
-                        public void visit(int v, int a, String name, String s, String sup, String[] i) {
-                            this.className = name.replace('/', '.');
-                        }
-                        @Override
-                        public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
-                            if (desc.equals("Lnet/minecraftforge/fml/common/Mod;") ||
-                                desc.equals("Lnet/neoforged/fml/common/Mod;")) {
-                                classes.add(className);
-                            }
-                            return null;
-                        }
-                    }, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
-                }
-            }
-        }
-        return classes;
     }
 
     private static void loadRealPlugins(String folderName) {
@@ -290,7 +138,6 @@ public class HybridLoader {
                     Map<String, Object> data = yaml.load(jarFile.getInputStream(ymlEntry));
                     String pluginName = String.valueOf(data.getOrDefault("name", jar.getName()));
                     String mainClass = String.valueOf(data.get("main"));
-                    boolean hasEmbeddedPack = jarFile.getEntry("assets/") != null || jarFile.getEntry("pack.mcmeta") != null;
 
                     URLClassLoader pluginLoader = new URLClassLoader(new URL[]{jar.toURI().toURL()}, HybridLoader.class.getClassLoader());
                     Class<?> clazz = Class.forName(mainClass, true, pluginLoader);
@@ -305,15 +152,13 @@ public class HybridLoader {
                     }
 
                     ACTIVE_PLUGINS.add(instance);
-                    String modeNote = hasEmbeddedPack ? "Has Embedded Texture Pack" : "Server-Side Only (No texture added)";
-                    System.out.println("[Hybrid-Plugins] Enabled Plugin: " + pluginName + " | " + modeNote);
+                    System.out.println("[Hybrid-Plugins] Enabled Plugin: " + pluginName);
                 }
             } catch (Exception e) {
                 System.err.println("[Hybrid-Plugins] Failed to enable " + jar.getName() + ": " + e.getMessage());
             }
         }
     }
-
     private static void loadAllBedrockPacks() {
         BEDROCK_PACKS.clear();
         try {
@@ -331,10 +176,7 @@ public class HybridLoader {
         scanPackFolder(new File("bedrock-packs/raw-packs"), "RAW_AUTO", mandatory);
         scanPackFolder(new File("bedrock-packs"), "ROOT_AUTO", mandatory);
 
-        if (BEDROCK_PACKS.isEmpty()) {
-            System.out.println("[Hybrid-BedrockPacks] No packs found. Skipping world_resource_packs.json / world_behavior_packs.json generation.");
-        } else {
-            System.out.println("[Hybrid-BedrockPacks] " + BEDROCK_PACKS.size() + " Bedrock-only pack(s) active. Mandatory download for Bedrock clients: " + mandatory);
+        if (!BEDROCK_PACKS.isEmpty()) {
             generateWorldPackBindings();
         }
     }
@@ -354,9 +196,7 @@ public class HybridLoader {
                     try {
                         String rawJson = Files.readString(manifestFile.toPath(), StandardCharsets.UTF_8);
                         parseAndRegisterPack(rawJson, item, forcedCategory, mandatory, item.getName().getBytes(StandardCharsets.UTF_8));
-                    } catch (Exception e) {
-                        System.err.println("[Hybrid-BedrockPacks] Error reading raw folder " + dirName + ": " + e.getMessage());
-                    }
+                    } catch (Exception ignored) {}
                 }
             } else {
                 String lower = item.getName().toLowerCase();
@@ -366,19 +206,8 @@ public class HybridLoader {
                         if (manifestEntry != null) {
                             String rawJson = new String(zip.getInputStream(manifestEntry).readAllBytes(), StandardCharsets.UTF_8);
                             parseAndRegisterPack(rawJson, item, forcedCategory, mandatory, Files.readAllBytes(item.toPath()));
-                        } else {
-                            Enumeration<JarEntry> entries = zip.entries();
-                            while (entries.hasMoreElements()) {
-                                JarEntry sub = entries.nextElement();
-                                if (sub.getName().endsWith("manifest.json")) {
-                                    String subJson = new String(zip.getInputStream(sub).readAllBytes(), StandardCharsets.UTF_8);
-                                    parseAndRegisterPack(subJson, item, "RAW_AUTO", mandatory, Files.readAllBytes(item.toPath()));
-                                }
-                            }
                         }
-                    } catch (Exception e) {
-                        System.err.println("[Hybrid-BedrockPacks] Error reading archive " + item.getName() + ": " + e.getMessage());
-                    }
+                    } catch (Exception ignored) {}
                 }
             }
         }
@@ -416,7 +245,6 @@ public class HybridLoader {
 
         byte[] hash = MessageDigest.getInstance("SHA-256").digest(bytesToHash);
         BEDROCK_PACKS.add(new BedrockPackInfo(uuid, version, name, detectedType, mandatory, source, source.length(), hash));
-        System.out.println("[Hybrid-BedrockPacks] [" + detectedType + "] Registered for Bedrock clients ONLY: " + name + " (UUID: " + uuid + " | v" + version + ")");
     }
 
     private static void generateWorldPackBindings() {
@@ -446,15 +274,11 @@ public class HybridLoader {
 
             if (!resourceArray.isEmpty()) {
                 Files.writeString(worldDir.resolve("world_resource_packs.json"), GSON.toJson(resourceArray));
-                System.out.println("[Hybrid-BedrockPacks] Generated /" + levelName + "/world_resource_packs.json (" + resourceArray.size() + " pack(s))");
             }
             if (!behaviorArray.isEmpty()) {
                 Files.writeString(worldDir.resolve("world_behavior_packs.json"), GSON.toJson(behaviorArray));
-                System.out.println("[Hybrid-BedrockPacks] Generated /" + levelName + "/world_behavior_packs.json (" + behaviorArray.size() + " pack(s))");
             }
-        } catch (Exception e) {
-            System.err.println("[Hybrid-BedrockPacks] Could not write world pack bindings: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
     }
 
     public static void shutdownAll() {
@@ -465,4 +289,4 @@ public class HybridLoader {
             } catch (Exception ignored) {}
         }
     }
-                                                       }
+}
