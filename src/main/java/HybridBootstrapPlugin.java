@@ -28,6 +28,6 @@ public class HybridBootstrapPlugin extends JavaPlugin {
     public static synchronized void bootHybrid() {
         if (started) return;
         started = true;
-        Thread.ofVirtual().start(() -> Main.main(new String));
+        Thread.ofVirtual().start(() -> Main.main(new String[]));
     }
 }
