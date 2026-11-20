@@ -32,7 +32,8 @@ public class HybridLoader {
 
     public record BedrockPackInfo(String uuid, String version, String name, String category, boolean mandatoryForBedrock, File source, long sizeBytes, byte[] sha256) {}
 
-    public static void initializeEnvironment() {
+    
+public static void initializeEnvironment() {
         setupModLoaderCore();
         loadRealMods("java-packs/mods");
         loadRealPlugins("java-packs/plugins");
@@ -83,7 +84,6 @@ public class HybridLoader {
                     pb.start().waitFor();
                     Files.deleteIfExists(installerPath);
                 }
-
                 deleteIfEmptyDir(Path.of("mods"));
 
                 try (Stream<Path> walk = Files.walk(librariesDir)) {
@@ -146,53 +146,62 @@ public class HybridLoader {
                 boolean isNeoForge = jarFile.getEntry("META-INF/neoforge.mods.toml") != null;
                 boolean isForge = jarFile.getEntry("META-INF/mods.toml") != null;
                 boolean isFabric = jarFile.getEntry("fabric.mod.json") != null;
-                boolean hasClientTextures = jarFile.getEntry("assets/") != null;
-
-                if (isNeoForge || isForge) {
-                    String type = isNeoForge ? "NeoForge" : "Forge";
-                    String side = hasClientTextures ? "Client+Server (Textures detected)" : "Server-Side Only (No client texture required)";
-                    List<String> modClasses = scanForgeModClasses(jarFile);
-                    for (String className : modClasses) {
-                        try {
-                            Class<?> clazz = Class.forName(className, true, modLoader);
-                            Object instance = clazz.getDeclaredConstructor().newInstance();
-                            ACTIVE_MODS.add(instance);
-                            System.out.println("[Hybrid-Mods] Loaded " + type + " @Mod: " + className + " | " + side);
-                        } catch (Throwable t) {
-                            System.out.println("[Hybrid-Mods] Queued " + type + " mod: " + jar.getName() + " | " + side);
-                        }
-                    }
-                    if (modClasses.isEmpty()) {
-                        System.out.println("[Hybrid-Mods] Queued " + type + " archive: " + jar.getName() + " | " + side);
-                    }
-                } else if (isFabric) {
-                    JarEntry entry = jarFile.getJarEntry("fabric.mod.json");
-                    String jsonText = new String(jarFile.getInputStream(entry).readAllBytes(), StandardCharsets.UTF_8);
-                    JsonObject json = GSON.fromJson(jsonText, JsonObject.class);
-
-                    if (json.has("entrypoints")) {
-                        JsonObject entrypoints = json.getAsJsonObject("entrypoints");
-                        JsonArray serverEntries = entrypoints.has("server") ? entrypoints.getAsJsonArray("server") : entrypoints.getAsJsonArray("main");
-                        if (serverEntries != null && !serverEntries.isEmpty()) {
-                            String mainClass = serverEntries.get(0).getAsString();
-                            Class<?> clazz = Class.forName(mainClass, true, modLoader);
-                            Object instance = clazz.getDeclaredConstructor().newInstance();
-                            for (Method m : clazz.getMethods()) {
-                                if (m.getName().equals("onInitializeServer") || m.getName().equals("onInitialize")) {
-                                    m.invoke(instance);
-                                }
-                            }
-                            ACTIVE_MODS.add(instance);
-                            System.out.println("[Hybrid-Mods] Executed Fabric Mod: " + jar.getName() + " (" + mainClass + ")");
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                System.err.println("[Hybrid-Mods] Error reading " + jar.getName() + ": " + e.getMessage());
-            }
-        }
+    public static void initializeEnvironment() {
+        organizeJavaPacksFolder();
+        setupModLoaderCore();
+        loadRealMods("java-packs/mods");
+        loadRealPlugins("java-packs/plugins");
+        loadAllBedrockPacks();
     }
 
+    private static void organizeJavaPacksFolder() {
+        try {
+            Path modsTarget = Path.of("java-packs/mods");
+            Path pluginsTarget = Path.of("java-packs/plugins");
+            Files.createDirectories(modsTarget);
+            Files.createDirectories(pluginsTarget);
+
+            // 1. Move qualquer mod da pasta padrão "mods/" para "java-packs/mods/"
+            Path rootMods = Path.of("mods");
+            if (Files.exists(rootMods) && Files.isDirectory(rootMods)) {
+                try (Stream<Path> files = Files.list(rootMods)) {
+                    files.filter(p -> p.toString().endsWith(".jar")).forEach(jar -> {
+                        try {
+                            Files.move(jar, modsTarget.resolve(jar.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+                            System.out.println("[Hybrid-Core] Moved mod to java-packs/mods: " + jar.getFileName());
+                        } catch (IOException ignored) {}
+                    });
+                }
+                deleteIfEmptyDir(rootMods);
+            }
+
+            // 2. Varre a raiz atrás de mods/plugins soltos (ignorando o server.jar)
+            try (Stream<Path> rootFiles = Files.list(Path.of("."))) {
+                rootFiles.filter(Files::isRegularFile)
+                         .filter(p -> p.toString().endsWith(".jar"))
+                         .filter(p -> !p.getFileName().toString().equalsIgnoreCase("server.jar"))
+                         .forEach(jar -> {
+                             try (JarFile jf = new JarFile(jar.toFile())) {
+                                 boolean isPlugin = jf.getEntry("plugin.yml") != null || jf.getEntry("paper-plugin.yml") != null;
+                                 boolean isMod = jf.getEntry("META-INF/neoforge.mods.toml") != null ||
+                                                 jf.getEntry("META-INF/mods.toml") != null ||
+                                                 jf.getEntry("fabric.mod.json") != null;
+                                 if (isPlugin) {
+                                     Files.move(jar, pluginsTarget.resolve(jar.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+                                     System.out.println("[Hybrid-Core] Moved loose plugin to java-packs/plugins: " + jar.getFileName());
+                                 } else if (isMod) {
+                                     Files.move(jar, modsTarget.resolve(jar.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+                                     System.out.println("[Hybrid-Core] Moved loose mod to java-packs/mods: " + jar.getFileName());
+                                 }
+                             } catch (Exception ignored) {}
+                         });
+            }
+        } catch (IOException e) {
+            System.err.println("[Hybrid-Core] Folder organization warning: " + e.getMessage());
+               }
+           }
+       }
+        
     private static List<String> scanForgeModClasses(JarFile jarFile) throws IOException {
         List<String> classes = new ArrayList<>();
         Enumeration<JarEntry> entries = jarFile.entries();
