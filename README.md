@@ -1,13 +1,1 @@
-# Hybrid Engine (1.21.11 Multi-Version)
-
-Hybrid Multi-Version server engine for Minecraft (**1.21.11 base**) that unifies **Java and Bedrock into one** (same default port or optional extra ports), with native support for all **Mods (NeoForge/Forge/Fabric)**, **Plugins (Paper/Purpur/Spigot/Bukkit)**, **Bedrock Packs**, and all versions in general.
-
-## How to Install (NeoForge Base Required)
-
-1. Go to the **Actions** tab, open the latest green build, and download the **`Hybrid-Universal-server`** (`.zip` file) under **Artifacts**.
-2. **Extract the `.zip` file** on your device to get the **`server.jar`** inside.
-3. In your hosting control panel (or PC), select the **NeoForge 1.21.11** software.
-4. Open the file manager and **delete the original `server.jar`** from NeoForge.
-5. Upload the extracted **Hybrid `server.jar`** to the main server directory.
-6. Start the server using **Java 21**.
-7. On first startup, **Hybrid** automatically downloads and builds the 1.21.11 environment, creates the `/mods`, `/plugins`, and `/bedrock-packs` folders, generates the full `server.properties`, and enables **Java + Bedrock** crossplay on the same port!
+Hybrid Engine (BETA) The ultimate Minecraft server software: Hybrid, Multi-version, and featuring Native Cross-Play. Hybrid is a revolutionary, beta-stage server software designed to unify the entire Minecraft ecosystem into a single file. No more setting up dozens of external bridges or choosing between mods and plugins—simply replace your current `server.jar` with Hybrid and you’re all set! Key Features • Universal Multi-Version: Choose any Minecraft version you’d like to play, with no complications. • Fully Hybrid (Mods + Plugins): Built-in support for running plugins (Paper, Purpur, Spigot) alongside mods (NeoForge and Fabric) on the same server. • Native Bedrock Support: Players on mobile, console, and Windows (Bedrock Edition) can join your Java server natively—no need to install Geyser or Floodgate separately. • Plug & Play Installation: Delete your old `server.jar`, replace it with the Hybrid `server.jar`, and start your server.
