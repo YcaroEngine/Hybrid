@@ -1,17 +1,25 @@
+import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.EventLoopGroup;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import org.cloudburstmc.netty.channel.raknet.RakChannelFactory;
-import org.cloudburstmc.netty.channel.raknet.config.RakChannelOption;
 
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
 public class HybridNetwork {
+
+    private static final byte[] RAKNET_MAGIC = new byte[]{
+        0x00, (byte) 0xFF, (byte) 0xFF, 0x00,
+        (byte) 0xFE, (byte) 0xFE, (byte) 0xFE, (byte) 0xFE,
+        (byte) 0xFD, (byte) 0xFD, (byte) 0xFD, (byte) 0xFD,
+        0x12, 0x34, 0x56, 0x78
+    };
 
     public static void start(String ip, int javaPort, int bedrockPort,
                              String motd, String javaWorldName, String bedrockWorldName,
@@ -48,6 +56,7 @@ public class HybridNetwork {
         if (allowBedrock) {
             Thread.ofVirtual().start(() -> {
                 try {
+                    long serverGuid = 13253860892328930865L;
                     String bedrockPing = String.join(";",
                         "MCPE",
                         motd,
@@ -55,7 +64,7 @@ public class HybridNetwork {
                         "1.21.11",
                         "0",
                         String.valueOf(maxPlayers),
-                        "13253860892328930865",
+                        String.valueOf(serverGuid),
                         bedrockWorldName,
                         gamemode.substring(0, 1).toUpperCase() + gamemode.substring(1),
                         "1",
@@ -63,15 +72,30 @@ public class HybridNetwork {
                         String.valueOf(bedrockPort)
                     ) + ";";
 
-                    ServerBootstrap b = new ServerBootstrap();
+                    Bootstrap b = new Bootstrap();
                     b.group(workerGroup)
-                     .channelFactory(RakChannelFactory.server(NioDatagramChannel.class))
-                     .option(RakChannelOption.RAK_ADVERTISEMENT, bedrockPing.getBytes(StandardCharsets.UTF_8))
-                     .childHandler(new ChannelInitializer<>() {
+                     .channel(NioDatagramChannel.class)
+                     .handler(new SimpleChannelInboundHandler<DatagramPacket>() {
                          @Override
-                         protected void initChannel(io.netty.channel.Channel ch) {
-                             ch.pipeline().addLast("bedrock-java-bridge",
-                                 new BedrockToJavaBridge(javaPort, onlineMode, skinsRestorer));
+                         protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket packet) {
+                             ByteBuf buf = packet.content();
+                             if (!buf.isReadable()) return;
+
+                             byte packetId = buf.readByte();
+                             if (packetId == 0x01 && buf.readableBytes() >= 8) {
+                                 long clientTime = buf.readLong();
+                                 byte[] motdBytes = bedrockPing.getBytes(StandardCharsets.UTF_8);
+
+                                 ByteBuf pong = Unpooled.buffer(35 + motdBytes.length);
+                                 pong.writeByte(0x1C);
+                                 pong.writeLong(clientTime);
+                                 pong.writeLong(serverGuid);
+                                 pong.writeBytes(RAKNET_MAGIC);
+                                 pong.writeShort(motdBytes.length);
+                                 pong.writeBytes(motdBytes);
+
+                                 ctx.writeAndFlush(new DatagramPacket(pong, packet.sender()));
+                             }
                          }
                      });
 
