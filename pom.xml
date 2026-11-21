@@ -19,12 +19,8 @@
             <url>https://papermc.io</url>
         </repository>
         <repository>
-            <id>opencollab-releases</id>
-            <url>https://opencollab.dev</url>
-        </repository>
-        <repository>
-            <id>opencollab-snapshots</id>
-            <url>https://opencollab.dev</url>
+            <id>loohpjames-mirror</id>
+            <url>https://repo.loohpjames.com/repository/</url>
         </repository>
     </repositories>
 
