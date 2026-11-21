@@ -32,6 +32,17 @@
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>org.allaymc.protocol</groupId>
+            <artifactId>bedrock-codec</artifactId>
+            <version>1.26.50-R1</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
             <groupId>org.cloudburstmc</groupId>
             <artifactId>nbt</artifactId>
             <version>3.0.4.Final</version>
