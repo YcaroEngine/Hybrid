@@ -9,7 +9,7 @@ import org.cloudburstmc.netty.channel.raknet.RakChannelFactory;
 import org.cloudburstmc.netty.channel.raknet.config.RakChannelOption;
 import org.cloudburstmc.protocol.bedrock.BedrockPong;
 import org.cloudburstmc.protocol.bedrock.BedrockServerSession;
-import org.cloudburstmc.protocol.bedrock.codec.v766.Bedrock_v766;
+import org.cloudburstmc.protocol.bedrock.codec.v2225.Bedrock_v2225;
 import org.cloudburstmc.protocol.bedrock.netty.initializer.BedrockServerInitializer;
 
 import java.net.InetSocketAddress;
@@ -59,8 +59,8 @@ public class HybridNetwork {
                         .playerCount(0)
                         .maximumPlayerCount(maxPlayers)
                         .gameType(gamemode.substring(0, 1).toUpperCase() + gamemode.substring(1))
-                        .protocolVersion(Bedrock_v766.CODEC.getProtocolVersion())
-                        .version(Bedrock_v766.CODEC.getMinecraftVersion())
+                        .protocolVersion(Bedrock_v2225.CODEC.getProtocolVersion())
+                        .version(Bedrock_v2225.CODEC.getMinecraftVersion())
                         .ipv4Port(bedrockPort)
                         .ipv6Port(bedrockPort);
 
@@ -71,13 +71,13 @@ public class HybridNetwork {
                      .childHandler(new BedrockServerInitializer() {
                          @Override
                          protected void initSession(BedrockServerSession session) {
-                             session.setCodec(Bedrock_v766.CODEC);
+                             session.setCodec(Bedrock_v2225.CODEC);
                              session.setPacketHandler(new BedrockToJavaBridge(session, internalBackendPort, onlineMode, skinsRestorer));
                          }
                      });
 
                     b.bind(new InetSocketAddress(ip, bedrockPort)).sync();
-                    System.out.println("[Hybrid-Network] Bedrock Edition (Cloudburst RakNet) ONLINE on " + ip + ":" + bedrockPort);
+                    System.out.println("[Hybrid-Network] Bedrock Edition (Cloudburst RakNet 1.26.60) ONLINE on " + ip + ":" + bedrockPort);
                 } catch (Exception e) {
                     System.err.println("[Hybrid-Network] Failed to bind Bedrock UDP port " + bedrockPort + ": " + e.getMessage());
                 }
