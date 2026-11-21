@@ -72,7 +72,8 @@ public class HybridNetwork {
                          @Override
                          protected void initSession(BedrockServerSession session) {
                              session.setCodec(Bedrock_v944.CODEC);
-                             session.setPacketHandler(new BedrockToJavaBridge(session, internalBackendPort, onlineMode, skinsRestorer));
+                             session.getPeer().getChannel().pipeline().addLast("hybrid-bridge",
+                                 new BedrockToJavaBridge(session, internalBackendPort, onlineMode, skinsRestorer));
                          }
                      });
 
