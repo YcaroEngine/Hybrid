@@ -22,11 +22,8 @@
             </snapshots>
         </repository>
         <repository>
-            <id>allaymc-releases</id>
-            <url>https://allaymc.org</url>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
         </repository>
         <repository>
             <id>spigot-repo</id>
@@ -45,9 +42,14 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>org.allaymc.protocol</groupId>
+            <groupId>com.github.CloudburstMC.Protocol</groupId>
             <artifactId>bedrock-connection</artifactId>
-            <version>1.26.50-R1</version>
+            <version>3.0.0.Beta11</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.CloudburstMC.Network</groupId>
+            <artifactId>netty-transport-raknet</artifactId>
+            <version>1.0.0.CR1</version>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
