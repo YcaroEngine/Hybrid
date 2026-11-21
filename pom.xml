@@ -11,16 +11,42 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>org.allaymc.protocol</groupId>
             <artifactId>bedrock-connection</artifactId>
             <version>1.26.50-R1</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.cloudburstmc.math</groupId>
+                    <artifactId>immutable</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.nukkitx</groupId>
+                    <artifactId>natives</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.cloudburstmc.netty</groupId>
+                    <artifactId>netty-transport-raknet</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
-            <groupId>dev.kastle.netty</groupId>
+            <groupId>com.github.CloudburstMC.Math</groupId>
+            <artifactId>immutable</artifactId>
+            <version>2.0.1.Final</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.CloudburstMC.Network</groupId>
             <artifactId>netty-transport-raknet</artifactId>
-            <version>1.7.3</version>
+            <version>1.1.0.CR2</version>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
