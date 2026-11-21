@@ -9,14 +9,14 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import org.cloudburstmc.protocol.bedrock.BedrockServerSession;
 import org.cloudburstmc.protocol.bedrock.data.PacketCompressionAlgorithm;
+import org.cloudburstmc.protocol.bedrock.netty.BedrockPacketWrapper;
 import org.cloudburstmc.protocol.bedrock.packet.*;
-import org.cloudburstmc.protocol.common.PacketSignal;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.UUID;
 
-public class BedrockToJavaBridge implements BedrockPacketHandler {
+public class BedrockToJavaBridge extends SimpleChannelInboundHandler<BedrockPacketWrapper> {
     private static final Gson GSON = new Gson();
     private final BedrockServerSession session;
     private final int targetJavaPort;
@@ -36,57 +36,52 @@ public class BedrockToJavaBridge implements BedrockPacketHandler {
     }
 
     @Override
-    public PacketSignal handle(RequestNetworkSettingsPacket packet) {
-        PacketCompressionAlgorithm algorithm = PacketCompressionAlgorithm.ZLIB;
+    protected void channelRead0(ChannelHandlerContext ctx, BedrockPacketWrapper wrapper) {
+        BedrockPacket packet = wrapper.getPacket();
 
-        NetworkSettingsPacket response = new NetworkSettingsPacket();
-        response.setCompressionThreshold(1);
-        response.setCompressionAlgorithm(algorithm);
-        session.sendPacketImmediately(response);
+        if (packet instanceof RequestNetworkSettingsPacket) {
+            PacketCompressionAlgorithm algorithm = PacketCompressionAlgorithm.ZLIB;
 
-        session.setCompression(algorithm);
-        return PacketSignal.HANDLED;
-    }
+            NetworkSettingsPacket response = new NetworkSettingsPacket();
+            response.setCompressionThreshold(1);
+            response.setCompressionAlgorithm(algorithm);
+            session.sendPacketImmediately(response);
 
-    @Override
-    public PacketSignal handle(LoginPacket packet) {
-        try {
-            if (packet.getAuthPayload() != null) {
-                extractUsernameFromJwt(packet.getAuthPayload().toString());
+            session.setCompression(algorithm);
+        } else if (packet instanceof LoginPacket loginPacket) {
+            try {
+                if (loginPacket.getAuthPayload() != null) {
+                    extractUsernameFromJwt(loginPacket.getAuthPayload().toString());
+                }
+            } catch (Exception ignored) {}
+
+            this.playerUuid = UUID.nameUUIDFromBytes(("Bedrock:" + bedrockUsername).getBytes(StandardCharsets.UTF_8));
+            System.out.println("[Hybrid-Bedrock] Player logged in: " + bedrockUsername + " (" + playerUuid + ")");
+
+            PlayStatusPacket status = new PlayStatusPacket();
+            status.setStatus(PlayStatusPacket.Status.LOGIN_SUCCESS);
+            session.sendPacket(status);
+
+            ResourcePacksInfoPacket packsInfo = new ResourcePacksInfoPacket();
+            packsInfo.setForcedToAccept(false);
+            packsInfo.setHasAddonPacks(false);
+            packsInfo.setScriptingEnabled(false);
+            session.sendPacket(packsInfo);
+
+            connectToJavaBackend();
+        } else if (packet instanceof ResourcePackClientResponsePacket resp) {
+            if (resp.getStatus() == ResourcePackClientResponsePacket.Status.HAVE_ALL_PACKS) {
+                ResourcePackStackPacket stack = new ResourcePackStackPacket();
+                stack.setForcedToAccept(false);
+                stack.setGameVersion("*");
+                session.sendPacket(stack);
+            } else if (resp.getStatus() == ResourcePackClientResponsePacket.Status.COMPLETED) {
+                System.out.println("[Hybrid-Bedrock] Resource packs completed for " + bedrockUsername + ". Entering world...");
+                PlayStatusPacket playStatus = new PlayStatusPacket();
+                playStatus.setStatus(PlayStatusPacket.Status.PLAYER_SPAWN);
+                session.sendPacket(playStatus);
             }
-        } catch (Exception ignored) {}
-
-        this.playerUuid = UUID.nameUUIDFromBytes(("Bedrock:" + bedrockUsername).getBytes(StandardCharsets.UTF_8));
-        System.out.println("[Hybrid-Bedrock] Player logged in: " + bedrockUsername + " (" + playerUuid + ")");
-
-        PlayStatusPacket status = new PlayStatusPacket();
-        status.setStatus(PlayStatusPacket.Status.LOGIN_SUCCESS);
-        session.sendPacket(status);
-
-        ResourcePacksInfoPacket packsInfo = new ResourcePacksInfoPacket();
-        packsInfo.setForcedToAccept(false);
-        packsInfo.setHasAddonPacks(false);
-        packsInfo.setScriptingEnabled(false);
-        session.sendPacket(packsInfo);
-
-        connectToJavaBackend();
-        return PacketSignal.HANDLED;
-    }
-
-    @Override
-    public PacketSignal handle(ResourcePackClientResponsePacket packet) {
-        if (packet.getStatus() == ResourcePackClientResponsePacket.Status.HAVE_ALL_PACKS) {
-            ResourcePackStackPacket stack = new ResourcePackStackPacket();
-            stack.setForcedToAccept(false);
-            stack.setGameVersion("*");
-            session.sendPacket(stack);
-        } else if (packet.getStatus() == ResourcePackClientResponsePacket.Status.COMPLETED) {
-            System.out.println("[Hybrid-Bedrock] Resource packs completed for " + bedrockUsername + ". Entering world...");
-            PlayStatusPacket playStatus = new PlayStatusPacket();
-            playStatus.setStatus(PlayStatusPacket.Status.PLAYER_SPAWN);
-            session.sendPacket(playStatus);
         }
-        return PacketSignal.HANDLED;
     }
 
     private void connectToJavaBackend() {
