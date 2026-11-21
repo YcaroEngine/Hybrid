@@ -18,28 +18,24 @@
             <id>papermc</id>
             <url>https://papermc.io</url>
         </repository>
-        <repository>
-            <id>loohpjames-mirror</id>
-            <url>https://repo.loohpjames.com/repository/</url>
-        </repository>
     </repositories>
 
     <dependencies>
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.21.4-R0.1-SNAPSHOT</version>
+            <version>1.21.1-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>org.cloudburstmc.protocol</groupId>
+            <groupId>org.allaymc.protocol</groupId>
             <artifactId>bedrock-connection</artifactId>
-            <version>3.0.0.Beta14-SNAPSHOT</version>
+            <version>1.26.50-R1</version>
         </dependency>
         <dependency>
-            <groupId>org.cloudburstmc.netty</groupId>
+            <groupId>dev.kastle.netty</groupId>
             <artifactId>netty-transport-raknet</artifactId>
-            <version>1.0.0.CR3-SNAPSHOT</version>
+            <version>1.7.3</version>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
