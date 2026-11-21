@@ -2,7 +2,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
@@ -62,7 +61,7 @@ public class HybridLoader {
 
             if (unixArgs.isEmpty()) {
                 System.out.println("[Hybrid-Core] Fetching latest NeoForge 1.21.11 from official Maven...");
-                String host = "https://neoforged.net";
+                String host = "https://" + "maven.neoforged.net/releases/net/neoforged/neoforge/";
                 String metadataUrl = host + "maven-metadata.xml";
                 String xml = new String(URI.create(metadataUrl).toURL().openStream().readAllBytes(), StandardCharsets.UTF_8);
 
@@ -143,13 +142,9 @@ public class HybridLoader {
                     Class<?> clazz = Class.forName(mainClass, true, pluginLoader);
                     Object instance = clazz.getDeclaredConstructor().newInstance();
 
-                    if (instance instanceof JavaPlugin jp) {
-                        jp.onLoad();
-                        jp.setEnabled(true);
-                    } else {
-                        try { clazz.getMethod("onLoad").invoke(instance); } catch (NoSuchMethodException ignored) {}
-                        try { clazz.getMethod("onEnable").invoke(instance); } catch (NoSuchMethodException ignored) {}
-                    }
+                    try { clazz.getMethod("onLoad").invoke(instance); } catch (Throwable ignored) {}
+                    try { clazz.getMethod("setEnabled", boolean.class).invoke(instance, true); } catch (Throwable ignored) {}
+                    try { clazz.getMethod("onEnable").invoke(instance); } catch (Throwable ignored) {}
 
                     ACTIVE_PLUGINS.add(instance);
                     System.out.println("[Hybrid-Plugins] Enabled Plugin: " + pluginName);
@@ -283,10 +278,8 @@ public class HybridLoader {
 
     public static void shutdownAll() {
         for (Object plugin : ACTIVE_PLUGINS) {
-            try {
-                if (plugin instanceof JavaPlugin jp) jp.setEnabled(false);
-                else plugin.getClass().getMethod("onDisable").invoke(plugin);
-            } catch (Exception ignored) {}
+            try { plugin.getClass().getMethod("setEnabled", boolean.class).invoke(plugin, false); } catch (Throwable ignored) {}
+            try { plugin.getClass().getMethod("onDisable").invoke(plugin); } catch (Throwable ignored) {}
         }
     }
 }
