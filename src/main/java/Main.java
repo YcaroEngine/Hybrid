@@ -9,21 +9,19 @@ public class Main {
     public static void main(String[] args) {
         long startTime = System.currentTimeMillis();
         try {
-            Files.createDirectories(Path.of(".hybrid"));
+            Files.createDirectories(Path.of(".hybrid", ".sys"));
             Files.createDirectories(Path.of("mods"));
             Files.createDirectories(Path.of("plugins"));
-            Files.createDirectories(Path.of("bedrock-packs/resource-packs"));
-            Files.createDirectories(Path.of("bedrock-packs/behavior-packs"));
-            Files.createDirectories(Path.of("bedrock-packs/raw-packs"));
+            Files.createDirectories(Path.of("bedrock-packs"));
             CONFIG.loadOrCreate();
 
-            String serverName = CONFIG.getString("server-name", "Hybrid Server");
-            String motd = CONFIG.getString("motd", "Hybrid Engine | Java & Bedrock");
-            String ip = CONFIG.getString("server-ip", "0.0.0.0");
-            int basePort = CONFIG.getInt("server-port", 25565);
+            int hostPort = HybridLoader.detectHostPort(CONFIG.getInt("server-port", 25565));
+            String hostMotd = HybridLoader.detectHostMotd(CONFIG.getString("motd", "Hybrid Engine | Java & Bedrock"));
+            String hostIp = HybridLoader.detectHostIp(CONFIG.getString("server-ip", "0.0.0.0"));
 
-            int javaPort = CONFIG.resolvePort("java-edition-port", basePort);
-            int bedrockPort = CONFIG.resolvePort("bedrock-edition-port", javaPort);
+            String serverName = CONFIG.getString("server-name", "Hybrid Server");
+            int javaPort = hostPort;
+            int bedrockPort = hostPort;
 
             String javaWorldName = CONFIG.getString("java-server-name", "World");
             String bedrockWorldName = CONFIG.getString("bedrock-server-name", "World");
@@ -43,19 +41,17 @@ public class Main {
             }
 
             System.out.println("==========================================================================");
-            System.out.println(" HYBRID ENGINE | " + serverName + " (1.21.11 Multi-Version Base)");
-            System.out.println(" Bind Address:          " + ip);
-            System.out.println(" Java Edition (TCP):    " + (allowJava ? "ENABLED -> Port " + javaPort + " (World: " + javaWorldName + ")" : "DISABLED"));
-            System.out.println(" Bedrock Edition (UDP): " + (allowBedrock ? "ENABLED -> Port " + bedrockPort + (bedrockPort == javaPort ? " [Same Port]" : " [Extra Port]") + " (World: " + bedrockWorldName + ")" : "DISABLED"));
-            System.out.println(" Online-Mode:           " + (onlineMode ? "TRUE (Mojang/Xbox Auth)" : "FALSE (Offline/Cracked)"));
-            System.out.println(" Network Compression:   " + compression + " bytes");
-            System.out.println(" Multi-Version Router:  " + allVersions + " (All Java & Bedrock Versions)");
+            System.out.println(" HYBRID ENGINE | " + serverName + " (NeoForge 1.21.11 + Paper + Bedrock 26.60)");
+            System.out.println(" Host Address:          " + hostIp + ":" + hostPort);
+            System.out.println(" Java Edition (TCP):    " + (allowJava ? "ENABLED -> Port " + javaPort + " (ViaVersion + ViaBackwards)" : "DISABLED"));
+            System.out.println(" Bedrock Edition (UDP): " + (allowBedrock ? "ENABLED -> Port " + bedrockPort + " [Same Port / NetherNet + Floodgate]" : "DISABLED"));
+            System.out.println(" Bedrock Prefix:        NONE (No dot '.' prefix)");
             System.out.println(" Native SkinsRestorer:  " + allowSkins);
             System.out.println("==========================================================================");
 
-            HybridLoader.initializeEnvironment();
+            HybridLoader.initializeEnvironment(hostIp, hostPort, hostMotd);
 
-            HybridNetwork.start(ip, javaPort, bedrockPort, motd, javaWorldName, bedrockWorldName,
+            HybridNetwork.start("0.0.0.0", javaPort, bedrockPort, hostMotd, javaWorldName, bedrockWorldName,
                                  maxPlayers, gamemode, compression, onlineMode, allVersions, allowJava, allowBedrock);
 
             double elapsed = (System.currentTimeMillis() - startTime) / 1000.0;
